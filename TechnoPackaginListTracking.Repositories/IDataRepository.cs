@@ -12,5 +12,10 @@ namespace TechnoPackaginListTracking.Repositories
         Task<ApiResponse<Details>> GetDetailsById(int id);
         Task<IEnumerable<Details>> GetAllDetails();
         Task<ApiResponse<Details>> UpsertDetails(Details data);
+
+        Task<ApiResponse<RequestForm>> GetRequestFormById(int id);
+        Task<IEnumerable<RequestForm>> GetAllRequests();
+        Task<ApiResponse<RequestForm>> UpsertRequestForm(RequestForm data);
+        Task<ApiResponse<bool>> DeleteRequestFormById(int id);
     }
 }

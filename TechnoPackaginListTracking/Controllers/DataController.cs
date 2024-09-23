@@ -49,5 +49,36 @@ namespace TechnoPackaginListTracking.Controllers
             return await _appRepository.UpsertDetails(details);
         }
         #endregion
+
+        #region Request Form
+        [HttpGet]
+        [Route("request-form/{id}")]
+        public async Task<ApiResponse<RequestForm>> GetRequestFormById(int id)
+        {
+            return await _appRepository.GetRequestFormById(id);
+        }
+
+        [HttpGet]
+        [Route("all-request-form")]
+        public async Task<IEnumerable<RequestForm>> GetAllRequests()
+        {
+            return await _appRepository.GetAllRequests();
+        }
+
+        [HttpPost]
+        [Route("upsert-request-form")]
+        public async Task<ApiResponse<RequestForm>> UpsertRequestForm(RequestForm data)
+        {
+
+            return await _appRepository.UpsertRequestForm(data);
+        }
+
+        [HttpDelete]
+        [Route("delete-request-form/{id}")]
+        public async Task<ApiResponse<bool>> DeleteRequestFormById(int id)
+        {
+            return await _appRepository.DeleteRequestFormById(id);
+        }
+        #endregion
     }
 }

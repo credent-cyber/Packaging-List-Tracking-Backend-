@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using TechnoPackaginListTracking.DataContext.Models;
 using TechnoPackaginListTracking.Dto.Auth;
 
 namespace TechnoPackaginListTracking.Controllers
@@ -18,21 +19,24 @@ namespace TechnoPackaginListTracking.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly UserManager<IdentityUser> _userManager;
-        private readonly SignInManager<IdentityUser> _signInManager;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly RoleManager<IdentityRole<Guid>> _roleManager;
         private readonly IConfiguration _configuration;
         private readonly IEmailSender _emailSender;
         private readonly ILogger<AuthController> _logger;
 
         public AuthController(
-            UserManager<IdentityUser> userManager,
-            SignInManager<IdentityUser> signInManager,
+            UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager,
+            RoleManager<IdentityRole<Guid>> roleManager,
             IConfiguration configuration,
             IEmailSender emailSender,
             ILogger<AuthController> logger)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            _roleManager = roleManager;
             _configuration = configuration;
             _emailSender = emailSender;
             _logger = logger;
@@ -43,7 +47,17 @@ namespace TechnoPackaginListTracking.Controllers
         {
             try
             {
-                var user = new IdentityUser { UserName = model.UserName, Email = model.Email, PhoneNumber = model.MobileNo };
+                var user = new ApplicationUser
+                {
+                    UserName = model.UserName,
+                    Email = model.Email,
+                    PhoneNumber = model.MobileNo,
+                    VendorId = model.VendorId,
+                    VendorName = model.VendorName,
+                    IsActive = model.IsActive
+                };
+
+                // Attempt to create the user
                 var result = await _userManager.CreateAsync(user, model.Password);
 
                 if (result.Succeeded)
@@ -52,14 +66,18 @@ namespace TechnoPackaginListTracking.Controllers
                     user.EmailConfirmed = true;
                     await _userManager.UpdateAsync(user);
 
-                    // Assign the first user as SuperAdmin
-                    var users = await _userManager.Users.ToListAsync();
-                    if (users.Count == 1)
+                    // Retrieve the list of users
+                    var userCount = await _userManager.Users.CountAsync();
+
+                    // Assign roles based on whether the user is the first in the system
+                    if (userCount == 1)
                     {
+                        // Assign "SuperAdmin" role to the first user
                         await _userManager.AddToRoleAsync(user, "SuperAdmin");
                     }
                     else
                     {
+                        // Assign "Vendor" role to subsequent users
                         await _userManager.AddToRoleAsync(user, "Vendor");
                     }
 
@@ -77,7 +95,6 @@ namespace TechnoPackaginListTracking.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while registering the user.");
             }
         }
-
 
 
         [HttpPost("login")]
@@ -216,6 +233,63 @@ namespace TechnoPackaginListTracking.Controllers
                 // Log the exception or handle it accordingly
                 return BadRequest($"Failed to change password: {ex.Message}");
             }
+        }
+
+        [Authorize]
+        [HttpPost("Logout")]
+        public async Task<IActionResult> Logout()
+        {
+            await _signInManager.SignOutAsync();
+            return Ok();
+        }
+
+        [Authorize]
+        [HttpGet("UserCount")]
+        public async Task<IActionResult> UserCount()
+        {
+            var userCount = await _userManager.Users.CountAsync();
+            return Ok(new { Count = userCount });
+        }
+
+        [Authorize(Roles = "SuperAdmin,Admin")]
+        [HttpPost]
+        public async Task<IActionResult> UpdateUserRole(UserViewModel userViewModel)
+        {
+            var user = await _userManager.FindByIdAsync(userViewModel.Id.ToString());
+
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+
+            // Remove all roles from the user
+            var removeRolesResult = await _userManager.RemoveFromRolesAsync(user, roles);
+            if (!removeRolesResult.Succeeded)
+            {
+                return BadRequest(removeRolesResult.Errors.FirstOrDefault()?.Description);
+            }
+
+            // Add the new role to the user
+            var role = await _roleManager.FindByNameAsync(userViewModel.Role);
+            if (role == null)
+            {
+                role = new IdentityRole<Guid>(userViewModel.Role);
+                var createRoleResult = await _roleManager.CreateAsync(role);
+                if (!createRoleResult.Succeeded)
+                {
+                    return BadRequest(createRoleResult.Errors.FirstOrDefault()?.Description);
+                }
+            }
+
+            var addRoleResult = await _userManager.AddToRoleAsync(user, userViewModel.Role);
+            if (!addRoleResult.Succeeded)
+            {
+                return BadRequest(addRoleResult.Errors.FirstOrDefault()?.Description);
+            }
+
+            return Ok();
         }
     }
 }

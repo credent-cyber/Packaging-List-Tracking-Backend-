@@ -17,5 +17,8 @@ namespace TechnoPackaginListTracking.DataContext
         }
 
         public DbSet<Details> Details { get; set; }
+        public DbSet<RequestForm> RequestForm { get; set; }
+        public DbSet<Cartons> Cartons { get; set; }
+        public DbSet<FileUploadDto> FileUploads { get; set; }
     }
 }

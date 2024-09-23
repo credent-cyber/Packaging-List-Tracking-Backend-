@@ -17,6 +17,8 @@ namespace TechnoPackaginListTracking.Dto.Auth
         public string Email { get; set; }
         [Required]
         public string MobileNo { get; set; }
+        public string VendorId { get; set; } = string.Empty;
+        public string VendorName { get; set; } = string.Empty;
 
         [Required]
         public string Password { get; set; }
