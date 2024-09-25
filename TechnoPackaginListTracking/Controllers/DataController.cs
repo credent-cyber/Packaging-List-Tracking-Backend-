@@ -10,47 +10,23 @@ namespace TechnoPackaginListTracking.Controllers
     [ApiController]
     public class DataController : ControllerBase
     {
-        readonly IDataRepository _appRepository;
-        readonly ILogger _logger;
-        readonly IConfiguration _configuration;
+        private readonly IDataRepository _appRepository;
+        private readonly ILogger<DataController> _logger;
+        private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _env;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public DataController(ILogger<DataController> logger, IConfiguration appConfig, IDataRepository appRepository, IWebHostEnvironment env) : base()
+        public DataController(ILogger<DataController> logger, IConfiguration appConfig, IDataRepository appRepository, IWebHostEnvironment env, IHttpContextAccessor httpContextAccessor) : base()
         {
-            _appRepository = (IDataRepository?)appRepository;
+            _appRepository = appRepository;
             _logger = logger;
             _configuration = appConfig;
             _env = env;
-            // Retrieve username and roles in the constructor and store them in _userName and _userRoles
-
+            _httpContextAccessor = httpContextAccessor;
         }
-
-        #region Details
-        [HttpGet]
-        [Route("details/{id}")]
-        public async Task<ApiResponse<Details>> GetDetailsById(int id)
-        {
-            return await _appRepository.GetDetailsById(id);
-        }
-
-        [HttpGet]
-        [Route("all-details")]
-        [AllowAnonymous]
-        public async Task<IEnumerable<Details>> GetAllDetails()
-        {
-            return await _appRepository.GetAllDetails();
-        }
-
-        [HttpPost]
-        [Route("UpsertDetails")]
-        public async Task<ApiResponse<Details>> UpsertDetails(Details details)
-        {
-
-            return await _appRepository.UpsertDetails(details);
-        }
-        #endregion
 
         #region Request Form
+
         [HttpGet]
         [Route("request-form/{id}")]
         public async Task<ApiResponse<RequestForm>> GetRequestFormById(int id)
@@ -60,7 +36,7 @@ namespace TechnoPackaginListTracking.Controllers
 
         [HttpGet]
         [Route("all-request-form")]
-        public async Task<IEnumerable<RequestForm>> GetAllRequests()
+        public async Task<ApiResponse<IEnumerable<RequestForm>>> GetAllRequests()
         {
             return await _appRepository.GetAllRequests();
         }
@@ -69,7 +45,6 @@ namespace TechnoPackaginListTracking.Controllers
         [Route("upsert-request-form")]
         public async Task<ApiResponse<RequestForm>> UpsertRequestForm(RequestForm data)
         {
-
             return await _appRepository.UpsertRequestForm(data);
         }
 
@@ -79,6 +54,29 @@ namespace TechnoPackaginListTracking.Controllers
         {
             return await _appRepository.DeleteRequestFormById(id);
         }
+
+        #endregion
+
+        #region Settings
+
+        [HttpPost]
+        [Route("get-settings")]
+        public async Task<Dictionary<string, string>> GetSettings(string Key)
+        {
+            var result = await _appRepository.GetSettings(Key);
+            return result;
+        }
+
+        [HttpPost]
+        [Route("upsert-settings")]
+        public async Task<Dictionary<string, string>> UpsertSettings(Dictionary<string, string> settings)
+        {
+            // get the username or other info from the current HttpContext
+            var currentUser = _httpContextAccessor?.HttpContext?.User?.Identity?.Name;
+            var result = await _appRepository.UpsertSettings(settings, currentUser);
+            return result;
+        }
+
         #endregion
     }
 }

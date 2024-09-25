@@ -9,13 +9,13 @@ namespace TechnoPackaginListTracking.Repositories
 {
     public interface IDataRepository
     {
-        Task<ApiResponse<Details>> GetDetailsById(int id);
-        Task<IEnumerable<Details>> GetAllDetails();
-        Task<ApiResponse<Details>> UpsertDetails(Details data);
-
         Task<ApiResponse<RequestForm>> GetRequestFormById(int id);
-        Task<IEnumerable<RequestForm>> GetAllRequests();
+        Task<ApiResponse<IEnumerable<RequestForm>>> GetAllRequests();
         Task<ApiResponse<RequestForm>> UpsertRequestForm(RequestForm data);
         Task<ApiResponse<bool>> DeleteRequestFormById(int id);
+        Task<Dictionary<string, string>> GetSettings(string Key);
+        Task<Dictionary<string, string>> UpsertSettings(Dictionary<string, string> settings, string value);
+
+
     }
 }

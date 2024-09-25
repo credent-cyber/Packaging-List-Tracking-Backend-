@@ -7,10 +7,51 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using TechnoPackaginListTracking.DataContext;
+using TechnoPackaginListTracking.DataContext.Models;
 using TechnoPackaginListTracking.Repositories;
 using TechnoPackaginListTracking.Services; // Assuming you have this namespace for EmailSender
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Retrieve configuration values
+var useSqlLite = builder.Configuration.GetValue<bool>("UseSqlLite");
+var SqlLiteAuthConnectionString = builder.Configuration.GetValue<string>("SqlLiteAuthConnectionString");
+var SqlLiteDBConnectionString = builder.Configuration.GetValue<string>("SqlLiteDBConnectionString");
+
+// Configure Entity Framework and Identity for Auth and App Databases
+if (useSqlLite)
+{
+    builder.Services.AddDbContext<AuthDbContext>(options =>
+    {
+        options.UseSqlite(SqlLiteAuthConnectionString);
+        options.EnableSensitiveDataLogging(); // Enable detailed logging
+        options.LogTo(Console.WriteLine);      // Log EF Core SQL queries to console
+    });
+
+    builder.Services.AddDbContext<AppDbContext>(options =>
+    {
+        options.UseSqlite(SqlLiteDBConnectionString);
+        options.EnableSensitiveDataLogging(); // Enable detailed logging
+        options.LogTo(Console.WriteLine);      // Log EF Core SQL queries to console
+    });
+}
+else
+{
+    // Configure MSSQL database context
+    builder.Services.AddDbContext<AuthDbContext>(options =>
+    {
+        options.UseSqlServer(builder.Configuration.GetConnectionString("AuthDBConnection"));
+        options.EnableSensitiveDataLogging(); // Enable detailed logging
+        options.LogTo(Console.WriteLine);      // Log EF Core SQL queries to console
+    });
+
+    builder.Services.AddDbContext<AppDbContext>(options =>
+    {
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultDbConnection"));
+        options.EnableSensitiveDataLogging(); // Enable detailed logging
+        options.LogTo(Console.WriteLine);      // Log EF Core SQL queries to console
+    });
+}
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -19,14 +60,8 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Configure MSSQL database context
-builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("AuthDBConnection")));
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultDbConnection")));
-
 // Configure Identity
-builder.Services.AddIdentity<IdentityUser, IdentityRole>()
+builder.Services.AddIdentity<ApplicationUser, IdentityRole<Guid>>()
     .AddEntityFrameworkStores<AuthDbContext>()
     .AddDefaultTokenProviders();
 
@@ -46,7 +81,8 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
+        ClockSkew = TimeSpan.Zero // Adjust clock skew if needed
     };
 });
 
@@ -56,9 +92,8 @@ var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get
 // Configure CORS to allow multiple domains
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowSpecificOrigins",
-        policyBuilder => policyBuilder
-            .WithOrigins(allowedOrigins)
+    options.AddPolicy("AllowSpecificOrigins", policyBuilder =>
+        policyBuilder.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod());
 });
@@ -90,9 +125,8 @@ builder.Services.Configure<IdentityOptions>(options =>
     options.Lockout.AllowedForNewUsers = true;
 
     // User settings
-    options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -._@+";
+    options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
     options.User.RequireUniqueEmail = true;
-  
 });
 
 // Configure Logging
@@ -100,7 +134,6 @@ builder.Logging.AddConsole();
 builder.Services.AddLogging();
 builder.Services.AddScoped<BaseRepository>();
 builder.Services.AddScoped<IDataRepository, DataRepository>();
-builder.Services.AddControllers();
 
 var app = builder.Build();
 
@@ -112,10 +145,11 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<AuthDbContext>();
         context.Database.Migrate();
+
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         if (db.Database.EnsureCreated())
         {
-            // seed data if a single tenant application
+            // Seed data if required
         }
     }
     catch (Exception ex)
@@ -126,7 +160,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
@@ -137,7 +171,6 @@ app.UseHttpsRedirection();
 // Enable CORS
 app.UseCors("AllowSpecificOrigins");
 
-// Enable authentication and authorization
 app.UseAuthentication();
 app.UseAuthorization();
 

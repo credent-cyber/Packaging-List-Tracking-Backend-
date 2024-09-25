@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.Identity.Client;
 using System;
 using System.Collections.Generic;
 using System.Data.Entity;
@@ -7,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TechnoPackaginListTracking.DataContext;
 using TechnoPackaginListTracking.Dto;
+using TechnoPackaginListTracking.Dto.Common;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace TechnoPackaginListTracking.Repositories
@@ -19,66 +21,6 @@ namespace TechnoPackaginListTracking.Repositories
             AppDbCxt = appContext;
         }
 
-        #region Details
-        public async Task<ApiResponse<Details>> GetDetailsById(int id)
-        {
-            var data = new ApiResponse<Details>();
-            try
-            {
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-                var queryData = AppDbCxt.Details.FirstOrDefault(o => o.Id == id);
-#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
-                data.IsSuccess = true;
-                data.Result = queryData;
-                return await Task.FromResult(data);
-            }
-            catch (Exception ex)
-            {
-                data.IsSuccess = false;
-                data.Message = ex.Message;
-                return data;
-            }
-
-        }
-
-        public async Task<IEnumerable<Details>> GetAllDetails()
-        {
-            IEnumerable<Details> result = null;
-
-            result = AppDbCxt.Details.ToList();
-            return result;
-        }
-        public async Task<ApiResponse<Details>> UpsertDetails(Details data)
-        {
-            var result = new ApiResponse<Details>();
-            try
-            {
-                if (data == null)
-                    throw new ArgumentNullException("Invalid Details data");
-
-                if (data.Id > 0)
-                {
-                    AppDbCxt.Details.Update(data);
-                }
-                else
-                {
-                    AppDbCxt.Details.Add(data);
-                }
-
-                AppDbCxt.SaveChanges();
-
-                result.IsSuccess = true;
-                result.Result = data;
-                return result;
-            }
-            catch (Exception ex)
-            {
-                result.IsSuccess = false;
-                result.Message = ex.Message;
-                return result;
-            }
-        }
-        #endregion
 
         #region Request Form
         public async Task<ApiResponse<RequestForm>> GetRequestFormById(int id)
@@ -87,7 +29,7 @@ namespace TechnoPackaginListTracking.Repositories
             try
             {
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-                var queryData = AppDbCxt.RequestForm.FirstOrDefault(o => o.Id == id);
+                var queryData = AppDbCxt.RequestForms.FirstOrDefault(o => o.Id == id);
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
                 data.IsSuccess = true;
                 data.Result = queryData;
@@ -102,15 +44,24 @@ namespace TechnoPackaginListTracking.Repositories
 
         }
 
-        public async Task<IEnumerable<RequestForm>> GetAllRequests()
+        public async Task<ApiResponse<IEnumerable<RequestForm>>> GetAllRequests()
         {
-            var result = await AppDbCxt.RequestForm
-                .Include(r => r.Cartons)
-                .Include(r => r.FileUploads)
-                .ToListAsync(); 
-
-            return result;
+            var data = new ApiResponse<IEnumerable<RequestForm>>();
+            try
+            {
+                data.Result =  AppDbCxt.RequestForms.Include(o=>o.Cartons).ToList();
+                data.IsSuccess = true;
+                data.Message = "Success";
+                return data;
+            }
+            catch (Exception ex)
+            {
+                data.IsSuccess = false;
+                data.Message = ex.Message;
+                return data;
+            }
         }
+
 
         public async Task<ApiResponse<RequestForm>> UpsertRequestForm(RequestForm data)
         {
@@ -124,7 +75,7 @@ namespace TechnoPackaginListTracking.Repositories
                 if (data.Id > 0)
                 {
                     // Retrieve the existing RequestForm from the database
-                    var existingRequestForm = AppDbCxt.RequestForm
+                    var existingRequestForm = AppDbCxt.RequestForms
                         .Include(r => r.Cartons)  
                         .Include(r => r.FileUploads) 
                         .FirstOrDefault(r => r.Id == data.Id);
@@ -135,7 +86,6 @@ namespace TechnoPackaginListTracking.Repositories
                 
                     AppDbCxt.Entry(existingRequestForm).CurrentValues.SetValues(data);
 
-                    // Handle Cartons (dependent table)
                     // Remove cartons that are not in the new data
                     foreach (var existingCarton in existingRequestForm.Cartons.ToList())
                     {
@@ -184,16 +134,17 @@ namespace TechnoPackaginListTracking.Repositories
                         }
                     }
 
-                    AppDbCxt.RequestForm.Update(existingRequestForm);
+                    AppDbCxt.RequestForms.Update(existingRequestForm);
                 }
                 else
                 {
-                    AppDbCxt.RequestForm.Add(data);
+                    AppDbCxt.RequestForms.Add(data);
                 }
 
                 AppDbCxt.SaveChanges();
 
                 result.IsSuccess = true;
+                result.Message = "Success";
                 result.Result = data;
                 return result;
             }
@@ -211,7 +162,7 @@ namespace TechnoPackaginListTracking.Repositories
             var result = new ApiResponse<bool>();
             try
             {
-                var requestForm = AppDbCxt.RequestForm.FirstOrDefault(o => o.Id == id);
+                var requestForm = AppDbCxt.RequestForms.FirstOrDefault(o => o.Id == id);
 
                 if (requestForm == null)
                 {
@@ -220,7 +171,7 @@ namespace TechnoPackaginListTracking.Repositories
                     return await Task.FromResult(result);
                 }
 
-                AppDbCxt.RequestForm.Remove(requestForm);
+                AppDbCxt.RequestForms.Remove(requestForm);
                 AppDbCxt.SaveChanges();
 
                 result.IsSuccess = true;
@@ -237,6 +188,58 @@ namespace TechnoPackaginListTracking.Repositories
         }
 
 
+        #endregion
+
+        #region Settings
+        public async Task<Dictionary<string, string>> GetSettings(string Key)
+        {
+            //var settings = await AppDbCxt.AppSettings.Where(o => o.Key == Constants.Keys.DocsUploadPath).ToListAsync();
+            var settings = await AppDbCxt.AppSettings.Where(o => o.Key == Key).ToListAsync();
+
+            return settings.ToDictionary(o => o.Key, v => v.Value);
+        }
+        public async Task<Dictionary<string, string>> UpsertSettings(Dictionary<string, string> settings, string user)
+        {
+            var inserted = new Dictionary<string, string>();
+
+            try
+            {
+                foreach (var key in settings.Keys)
+                {
+                    var setting = await AppDbCxt.AppSettings.FirstOrDefaultAsync(o => o.Key == key);
+
+                    if (setting != null)
+                    {
+                        setting.Value = settings[key];
+                        setting.ModifiedOn = DateTime.Now;
+                        setting.ModifiedBy = user;
+                        AppDbCxt.Update(setting);
+                    }
+                    else
+                    {
+                        setting = new AppSettings()
+                        {
+                            Key = key,
+                            Value = settings[key],
+                            CreatedBy = user,
+                            CreatedOn = DateTime.Now,
+                        };
+                        AppDbCxt.Add(setting);
+                    }
+
+                    inserted.Add(key, setting.Value);
+
+                    AppDbCxt.SaveChanges();
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                throw;
+            }
+            return inserted;
+        }
         #endregion
     }
 }

@@ -69,17 +69,32 @@ namespace TechnoPackaginListTracking.Controllers
                     // Retrieve the list of users
                     var userCount = await _userManager.Users.CountAsync();
 
-                    // Assign roles based on whether the user is the first in the system
+                    string roleToAssign;
+
                     if (userCount == 1)
                     {
                         // Assign "SuperAdmin" role to the first user
-                        await _userManager.AddToRoleAsync(user, "SuperAdmin");
+                        roleToAssign = "SuperAdmin";
                     }
                     else
                     {
-                        // Assign "Vendor" role to subsequent users
-                        await _userManager.AddToRoleAsync(user, "Vendor");
+                        // Assign "User" role to subsequent users
+                        roleToAssign = "Vendor";
                     }
+
+                    // Ensure the role exists before assigning it
+                    if (!await _roleManager.RoleExistsAsync(roleToAssign))
+                    {
+                        var roleResult = await _roleManager.CreateAsync(new IdentityRole<Guid>(roleToAssign));
+                        if (!roleResult.Succeeded)
+                        {
+                            _logger.LogError($"Error creating role: {string.Join(", ", roleResult.Errors.Select(e => e.Description))}");
+                            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to create role.");
+                        }
+                    }
+
+                    // Assign the role to the user
+                    await _userManager.AddToRoleAsync(user, roleToAssign);
 
                     _logger.LogInformation($"User registered successfully: {model.Email}");
 
@@ -95,6 +110,7 @@ namespace TechnoPackaginListTracking.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while registering the user.");
             }
         }
+
 
 
         [HttpPost("login")]
@@ -251,8 +267,8 @@ namespace TechnoPackaginListTracking.Controllers
             return Ok(new { Count = userCount });
         }
 
-        [Authorize(Roles = "SuperAdmin,Admin")]
-        [HttpPost]
+        [HttpPost("UpdateUserRole")]
+        //[Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> UpdateUserRole(UserViewModel userViewModel)
         {
             var user = await _userManager.FindByIdAsync(userViewModel.Id.ToString());
@@ -290,6 +306,26 @@ namespace TechnoPackaginListTracking.Controllers
             }
 
             return Ok();
+        }
+
+        [HttpGet("GetUsers")]
+       // [Authorize]
+        public async Task<IActionResult> GetUsers()
+        {
+            var users = await _userManager.Users.ToListAsync();
+
+            var userViewModels = users.Select(u => new UserViewModel
+            {
+                Id = u.Id,
+                UserName = u.UserName,
+                Email = u.Email,
+                VendorId = u.VendorId,
+                VendorName = u.VendorName,
+                Role = _userManager.GetRolesAsync(u).Result.FirstOrDefault(),
+                IsActive = u.IsActive,
+            }).ToList();
+
+            return Ok(userViewModels);
         }
     }
 }

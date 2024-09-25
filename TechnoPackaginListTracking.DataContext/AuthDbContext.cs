@@ -3,10 +3,11 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using TechnoPackaginListTracking.DataContext.Models;
 
 namespace TechnoPackaginListTracking.DataContext
 {
-    public class AuthDbContext : IdentityDbContext<IdentityUser>
+    public class AuthDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
     {
         public AuthDbContext(DbContextOptions<AuthDbContext> options) : base(options)
         {

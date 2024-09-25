@@ -26,12 +26,14 @@ namespace TechnoPackaginListTracking.Dto
         public string ShippingContainer { get; set; } = string.Empty;
         public string ShippingCompany { get; set; } = string.Empty;
         public string Mode { get; set; } = string.Empty;
-        public List<FileUploadDto> FileUploads { get; set; } = new List<FileUploadDto>();
+        public List<FileUploadDto> FileUploads { get; set; }
         public List<Cartons> Cartons { get; set; }
     }
 
     public class Cartons : BaseEntity
     {
+
+        public int RequestFormId {  get; set; }
         public string Carton { get; set; }
         public string ItemNumber { get; set; }
         public string Color { get; set; }
@@ -41,8 +43,9 @@ namespace TechnoPackaginListTracking.Dto
 
     public class FileUploadDto : BaseEntity
     {
+        public int RequestFormId { get; set; }
         public string FileName { get; set; }
         public string FileType { get; set; }
-        public byte[] FileContent { get; set; } // Or string for the file path, depending on your needs
+        public byte[] ? FileContent { get; set; } 
     }
 }
