@@ -26,14 +26,17 @@ namespace TechnoPackaginListTracking.Dto
         public string ShippingContainer { get; set; } = string.Empty;
         public string ShippingCompany { get; set; } = string.Empty;
         public string Mode { get; set; } = string.Empty;
-        public List<FileUploadDto> FileUploads { get; set; }
-        public List<Cartons> Cartons { get; set; }
+        public virtual ICollection<FileUploads> FileUploads { get; set; }
+        public virtual ICollection<Cartons> Cartons { get; set; }
+
     }
 
     public class Cartons : BaseEntity
     {
 
-        public int RequestFormId {  get; set; }
+        public int RequestFormId { get; set; } // This is the foreign key
+       // public virtual RequestForm? RequestForm { get; set; } // Navigation property
+
         public string Carton { get; set; }
         public string ItemNumber { get; set; }
         public string Color { get; set; }
@@ -41,11 +44,15 @@ namespace TechnoPackaginListTracking.Dto
         public string Quantity { get; set; }
     }
 
-    public class FileUploadDto : BaseEntity
+    public class FileUploads : BaseEntity
     {
-        public int RequestFormId { get; set; }
+
+        public int RequestFormId { get; set; } // This is the foreign key
+       // public virtual RequestForm RequestForm { get; set; } // Navigation property
+
         public string FileName { get; set; }
         public string FileType { get; set; }
-        public byte[] ? FileContent { get; set; } 
+        public byte[] ? FileContent { get; set; }
+
     }
 }

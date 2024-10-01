@@ -21,27 +21,35 @@ namespace TechnoPackaginListTracking.Controllers
         }
 
         [HttpPost("AppendFile/{fragment}")]
-        public async Task<UploadResult> UploadFileChunk(int fragment, IFormFile file)
+        public async Task<UploadResult> UploadFileChunk(int fragment, IFormFile file, string User)
         {
-            
             try
             {
+                // Get the document path from configuration
                 var DocumentPath = configuration.GetValue<string>("DocumentUploadPath");
 
-                var fileLocation = Path.Combine(env.ContentRootPath, DocumentPath, file.FileName);
+                // Generate a unique file name by appending the user and current datetime
+                var fileExtension = Path.GetExtension(file.FileName);
+                var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss"); 
+                var uniqueFileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}_{User}_{timestamp}{fileExtension}";
 
+                var fileLocation = Path.Combine(env.ContentRootPath, DocumentPath, uniqueFileName);
+
+                // If it's the first chunk and the file already exists, delete the existing file
                 if (fragment == 0 && IO.File.Exists(fileLocation))
                 {
                     IO.File.Delete(fileLocation);
                 }
+
+                // Append the incoming file chunk to the file
                 using (var fileStream = new FileStream(fileLocation, FileMode.Append, FileAccess.Write, FileShare.None))
                 using (var bw = new BinaryWriter(fileStream))
                 {
                     await file.CopyToAsync(fileStream);
                 }
 
-                var fileName = Path.GetFileName(fileLocation);
-                return new UploadResult { IsUploaded = true, FileLocation = fileName };
+                // Return the unique file name with the result
+                return new UploadResult { IsUploaded = true, FileLocation = uniqueFileName };
             }
             catch (Exception exception)
             {
@@ -49,6 +57,7 @@ namespace TechnoPackaginListTracking.Controllers
             }
             return new UploadResult { IsUploaded = false, FileLocation = "" };
         }
+
 
         [HttpGet("DownloadFile/{fileName}")]
         public IActionResult DownloadFile(string fileName)

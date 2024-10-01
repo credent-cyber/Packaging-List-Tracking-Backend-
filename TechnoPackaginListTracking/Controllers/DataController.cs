@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using TechnoPackaginListTracking.Dto;
 using TechnoPackaginListTracking.Repositories;
 
@@ -8,6 +9,7 @@ namespace TechnoPackaginListTracking.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class DataController : ControllerBase
     {
         private readonly IDataRepository _appRepository;
@@ -36,6 +38,7 @@ namespace TechnoPackaginListTracking.Controllers
 
         [HttpGet]
         [Route("all-request-form")]
+      
         public async Task<ApiResponse<IEnumerable<RequestForm>>> GetAllRequests()
         {
             return await _appRepository.GetAllRequests();

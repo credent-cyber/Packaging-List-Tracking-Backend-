@@ -1,15 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
-using Microsoft.Identity.Client;
-using System;
-using System.Collections.Generic;
-using System.Data.Entity;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TechnoPackaginListTracking.DataContext;
 using TechnoPackaginListTracking.Dto;
-using TechnoPackaginListTracking.Dto.Common;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+using Microsoft.EntityFrameworkCore;
 
 namespace TechnoPackaginListTracking.Repositories
 {
@@ -29,8 +24,9 @@ namespace TechnoPackaginListTracking.Repositories
             try
             {
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-                var queryData = AppDbCxt.RequestForms.FirstOrDefault(o => o.Id == id);
+                var queryData = AppDbCxt.RequestForms.Include(o=>o.Cartons).Include(o=>o.FileUploads).FirstOrDefault(o => o.Id == id);
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
+          
                 data.IsSuccess = true;
                 data.Result = queryData;
                 return await Task.FromResult(data);
@@ -49,17 +45,21 @@ namespace TechnoPackaginListTracking.Repositories
             var data = new ApiResponse<IEnumerable<RequestForm>>();
             try
             {
-                data.Result =  AppDbCxt.RequestForms.Include(o=>o.Cartons).ToList();
+                data.Result = await AppDbCxt.RequestForms
+                    .Include(o => o.Cartons) // Correctly include Cartons
+                    .Include(o => o.FileUploads) // Correctly include Cartons
+                    .AsNoTracking() // Optional: improve performance
+                    .ToListAsync(); // Asynchronous call
+
                 data.IsSuccess = true;
                 data.Message = "Success";
-                return data;
             }
             catch (Exception ex)
             {
                 data.IsSuccess = false;
                 data.Message = ex.Message;
-                return data;
             }
+            return data;
         }
 
 
@@ -76,8 +76,8 @@ namespace TechnoPackaginListTracking.Repositories
                 {
                     // Retrieve the existing RequestForm from the database
                     var existingRequestForm = AppDbCxt.RequestForms
-                        .Include(r => r.Cartons)  
                         .Include(r => r.FileUploads) 
+                        .Include(r => r.Cartons)  
                         .FirstOrDefault(r => r.Id == data.Id);
 
                     if (existingRequestForm == null)

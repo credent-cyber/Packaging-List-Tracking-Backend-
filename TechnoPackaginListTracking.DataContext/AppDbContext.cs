@@ -16,22 +16,23 @@ namespace TechnoPackaginListTracking.DataContext
                 Database.EnsureCreated();
         }
 
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            modelBuilder.Entity<Cartons>()
-                .HasOne<RequestForm>()
-                .WithMany(r => r.Cartons)
-                .HasForeignKey(c => c.RequestFormId);
-
-            modelBuilder.Entity<FileUploadDto>()
-                .HasOne<RequestForm>()
-                .WithMany(r => r.FileUploads)
-                .HasForeignKey(f => f.RequestFormId);
-        }
-
+       
         public DbSet<RequestForm> RequestForms { get; set; }
         public DbSet<Cartons> Cartons { get; set; }
-        public DbSet<FileUploadDto> FileUploads { get; set; }
+        public DbSet<FileUploads> FileUploads { get; set; }
         public DbSet<AppSettings> AppSettings { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            //modelBuilder.Entity<RequestForm>()
+            //    .HasMany(r => r.Cartons)
+            //    //.WithOne(c => c.RequestForm)
+            //    .HasForeignKey(c => c.RequestFormId);
+
+            //modelBuilder.Entity<RequestForm>()
+            //    .HasMany(r => r.FileUploads)
+            //   // .WithOne(f => f.RequestForm)
+            //    .HasForeignKey(f => f.RequestFormId);
+        }
     }
 }

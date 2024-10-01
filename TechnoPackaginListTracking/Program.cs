@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
+using Microsoft.AspNetCore.OData;
+using Microsoft.AspNetCore.OData.Batch;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -8,8 +10,9 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using TechnoPackaginListTracking.DataContext;
 using TechnoPackaginListTracking.DataContext.Models;
+using TechnoPackaginListTracking.Infrastructure;
 using TechnoPackaginListTracking.Repositories;
-using TechnoPackaginListTracking.Services; // Assuming you have this namespace for EmailSender
+using TechnoPackaginListTracking.Services; 
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,14 +28,14 @@ if (useSqlLite)
     {
         options.UseSqlite(SqlLiteAuthConnectionString);
         options.EnableSensitiveDataLogging(); // Enable detailed logging
-        options.LogTo(Console.WriteLine);      // Log EF Core SQL queries to console
+        //options.LogTo(Console.WriteLine);      // Log EF Core SQL queries to console
     });
 
     builder.Services.AddDbContext<AppDbContext>(options =>
     {
         options.UseSqlite(SqlLiteDBConnectionString);
         options.EnableSensitiveDataLogging(); // Enable detailed logging
-        options.LogTo(Console.WriteLine);      // Log EF Core SQL queries to console
+        //options.LogTo(Console.WriteLine);      // Log EF Core SQL queries to console
     });
 }
 else
@@ -42,19 +45,21 @@ else
     {
         options.UseSqlServer(builder.Configuration.GetConnectionString("AuthDBConnection"));
         options.EnableSensitiveDataLogging(); // Enable detailed logging
-        options.LogTo(Console.WriteLine);      // Log EF Core SQL queries to console
+        //options.LogTo(Console.WriteLine);      // Log EF Core SQL queries to console
     });
 
     builder.Services.AddDbContext<AppDbContext>(options =>
     {
         options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultDbConnection"));
         options.EnableSensitiveDataLogging(); // Enable detailed logging
-        options.LogTo(Console.WriteLine);      // Log EF Core SQL queries to console
+        //options.LogTo(Console.WriteLine);      // Log EF Core SQL queries to console
     });
 }
 
-// Add services to the container.
-builder.Services.AddControllers();
+// Add services to the container, using OData
+builder.Services.AddControllers()
+    .AddODataControllers()
+    .AddNewtonsoftJson();
 
 // Configure Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
@@ -78,11 +83,11 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
+        //ValidateIssuerSigningKey = true,
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
-        ClockSkew = TimeSpan.Zero // Adjust clock skew if needed
+        //ClockSkew = TimeSpan.Zero // Adjust clock skew if needed
     };
 });
 
@@ -95,8 +100,10 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowSpecificOrigins", policyBuilder =>
         policyBuilder.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod());
+            .AllowAnyMethod()
+            .AllowCredentials());
 });
+
 
 // Configure EmailSender
 builder.Services.AddTransient<IEmailSender>(provider =>
@@ -129,11 +136,20 @@ builder.Services.Configure<IdentityOptions>(options =>
     options.User.RequireUniqueEmail = true;
 });
 
+
 // Configure Logging
 builder.Logging.AddConsole();
 builder.Services.AddLogging();
 builder.Services.AddScoped<BaseRepository>();
 builder.Services.AddScoped<IDataRepository, DataRepository>();
+// Add services to the container.
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+builder.Logging.AddConsole();
+builder.Services.AddLogging();
+
 
 var app = builder.Build();
 
