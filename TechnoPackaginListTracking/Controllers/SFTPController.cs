@@ -2,7 +2,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Renci.SshNet;
 using System.IO;
+using System.IO.Compression;
 using System.Threading.Tasks;
+using TechnoPackaginListTracking.Dto;
+using IO = System.IO;
 
 namespace TechnoPackaginListTracking.Controllers
 {
@@ -16,8 +19,10 @@ namespace TechnoPackaginListTracking.Controllers
         private readonly string _password;
         private readonly string _remoteUploadPath;
         private readonly ILogger<SFTPController> _logger;
+        private readonly IWebHostEnvironment _env;
+        private readonly IConfiguration _configuration;
 
-        public SFTPController(IConfiguration configuration, ILogger<SFTPController> logger)
+        public SFTPController(IConfiguration configuration, ILogger<SFTPController> logger, IWebHostEnvironment env)
         {
             _host = configuration["SftpSettings:Host"];
             _port = int.Parse(configuration["SftpSettings:Port"]);
@@ -25,146 +30,147 @@ namespace TechnoPackaginListTracking.Controllers
             _password = configuration["SftpSettings:Password"];
             _remoteUploadPath = configuration["SftpSettings:RemoteUploadPath"];
             _logger = logger;
+            _env = env;
+            _configuration = configuration;
         }
 
-        // Upload a file chunk to the SFTP server
-        [HttpPost("upload-chunk")]
-        public async Task<IActionResult> UploadChunk([FromForm] IFormFile file, [FromForm] int chunkNumber, [FromForm] int totalChunks, [FromForm] string fileName)
+        [HttpPost("AppendFile/{fragment}/{totalChunks}")]
+        public async Task<UploadResult> UploadFileChunk([FromForm] int fragment, [FromForm] int totalChunks, [FromForm] IFormFile file, [FromForm] string user, [FromForm] string requestId)
         {
-            if (file == null || file.Length == 0)
-            {
-                return BadRequest("No file uploaded.");
-            }
-
             try
             {
-                string tempFolderPath = Path.Combine(Path.GetTempPath(), "sftp_temp");
-                if (!Directory.Exists(tempFolderPath))
+                // Generate the remote directory path based on requestId
+                var remoteDirectory = $"{requestId}";
+
+                // Ensure the file has a proper extension
+                var fileExtension = Path.GetExtension(file.FileName);
+                var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(file.FileName);
+
+                // Generate a unique file name by appending the user and file extension
+                var uniqueFileName = $"{fileNameWithoutExtension}_{user}{fileExtension}";
+
+                // Full remote path where the file will be uploaded (including file extension)
+                var remoteFilePath = $"{remoteDirectory}/{uniqueFileName}";
+
+                // Connect to the SFTP server
+                using (var sftpClient = new SftpClient(_host, _port, _username, _password))
                 {
-                    Directory.CreateDirectory(tempFolderPath);
-                }
-
-                string tempFilePath = Path.Combine(tempFolderPath, fileName);
-
-                // Save the chunk to a temporary file
-                using (var fileStream = new FileStream(tempFilePath, FileMode.Append, FileAccess.Write))
-                {
-                    await file.CopyToAsync(fileStream);
-                }
-
-                _logger.LogInformation($"Received chunk {chunkNumber} of {totalChunks}");
-
-                // If this is the last chunk, upload the complete file to the SFTP server
-                if (chunkNumber == totalChunks)
-                {
-                    using (var client = new SftpClient(_host, _port, _username, _password))
+                    sftpClient.Connect();
+                    if (!sftpClient.IsConnected)
                     {
-                        client.Connect();
-                        if (!client.IsConnected)
+                        return new UploadResult { IsUploaded = false, Message = "Failed to connect to the SFTP server." };
+                    }
+
+                    // Check if the remote directory exists; create it if not
+                    if (!sftpClient.Exists(remoteDirectory))
+                    {
+                        _logger.LogInformation($"Creating directory: {remoteDirectory}");
+                        sftpClient.CreateDirectory(remoteDirectory);
+                    }
+
+                    // Open a stream to append the current chunk to the remote file
+                    using (var fileStream = file.OpenReadStream())
+                    {
+                        // If it's the first chunk and the file exists, delete the old file
+                        if (fragment == 0 && sftpClient.Exists(remoteFilePath))
                         {
-                            return StatusCode(500, "Failed to connect to the SFTP server.");
+                            sftpClient.DeleteFile(remoteFilePath);
                         }
 
-                        // Upload the completed file
-                        using (var localFileStream = new FileStream(tempFilePath, FileMode.Open))
+                        // Upload the current chunk to the remote file
+                        _logger.LogInformation($"Uploading chunk {fragment + 1}/{totalChunks} to {remoteFilePath}");
+                        sftpClient.UploadFile(fileStream, remoteFilePath, true);
+                    }
+
+                    sftpClient.Disconnect();
+                }
+
+                // Check if this is the last chunk
+                if (fragment == totalChunks - 1)
+                {
+                    return new UploadResult { IsUploaded = true, FileLocation = uniqueFileName, Message = "File uploaded successfully to SFTP." };
+                }
+
+                return new UploadResult { IsUploaded = true, FileLocation = uniqueFileName, Message = $"Chunk {fragment + 1}/{totalChunks} uploaded successfully." };
+            }
+            catch (Renci.SshNet.Common.SftpPathNotFoundException ex)
+            {
+                _logger.LogError($"SFTP path not found: {ex.Message}");
+                return new UploadResult { IsUploaded = false, Message = $"SFTP path not found: {ex.Message}" };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while uploading file chunk.");
+                return new UploadResult { IsUploaded = false, Message = $"Error: {ex.Message}" };
+            }
+        }
+
+
+        [HttpGet("DownloadFolder/{requestId}")]
+        public async Task<IActionResult> DownloadFolderAsZip(string requestId)
+        {
+            try
+            {
+                // Path of the remote folder to download
+                var remoteFolderPath = $"{requestId}";
+                var zipFilePath = Path.Combine(_env.ContentRootPath, $"{requestId}.zip");
+
+                // Connect to the SFTP server
+                using (var sftpClient = new SftpClient(_host, _port, _username, _password))
+                {
+                    sftpClient.Connect();
+                    if (!sftpClient.IsConnected)
+                    {
+                        return BadRequest("Failed to connect to the SFTP server.");
+                    }
+
+                    // Check if the remote directory exists
+                    if (!sftpClient.Exists(remoteFolderPath))
+                    {
+                        return NotFound("The specified folder does not exist on the SFTP server.");
+                    }
+
+                    // Create a zip file
+                    using (var zipFileStream = new FileStream(zipFilePath, FileMode.Create))
+                    using (var zipArchive = new ZipArchive(zipFileStream, ZipArchiveMode.Create, true))
+                    {
+                        // List all files in the remote directory
+                        var remoteFiles = sftpClient.ListDirectory(remoteFolderPath);
+
+                        foreach (var remoteFile in remoteFiles)
                         {
-                            client.UploadFile(localFileStream, $"{_remoteUploadPath}/{fileName}");
+                            // Ignore directories and add files to the zip
+                            if (!remoteFile.IsDirectory)
+                            {
+                                using (var fileStream = new MemoryStream())
+                                {
+                                    sftpClient.DownloadFile(remoteFile.FullName, fileStream);
+                                    fileStream.Position = 0; // Reset the position of the stream
+
+                                    // Create an entry in the zip file
+                                    var zipEntry = zipArchive.CreateEntry(remoteFile.Name);
+                                    using (var entryStream = zipEntry.Open())
+                                    {
+                                        await fileStream.CopyToAsync(entryStream);
+                                    }
+                                }
+                            }
                         }
-
-                        client.Disconnect();
                     }
 
-                    // Delete the temporary file after successful upload
-                    System.IO.File.Delete(tempFilePath);
-
-                    _logger.LogInformation("File uploaded successfully to the SFTP server.");
-                    return Ok(new { Message = "File uploaded successfully", FileName = fileName });
+                    sftpClient.Disconnect();
                 }
 
-                return Ok(new { Message = $"Chunk {chunkNumber} of {totalChunks} uploaded successfully." });
+                // Return the zip file as a downloadable response
+                var zipFileBytes = System.IO.File.ReadAllBytes(zipFilePath);
+                System.IO.File.Delete(zipFilePath); // Clean up the zip file after reading
+
+                return File(zipFileBytes, "application/zip", $"{requestId}.zip");
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Error uploading chunk: {ex.Message}");
-                return StatusCode(500, $"Error uploading chunk: {ex.Message}");
-            }
-        }
-
-        // Download a file from the SFTP server
-        [HttpGet("download-file/{fileName}")]
-        public IActionResult DownloadFile(string fileName)
-        {
-            try
-            {
-                using (var client = new SftpClient(_host, _port, _username, _password))
-                {
-                    client.Connect();
-                    if (!client.IsConnected)
-                    {
-                        return StatusCode(500, "Failed to connect to the SFTP server.");
-                    }
-
-                    // Remote file path
-                    string remoteFilePath = $"{_remoteUploadPath}/{fileName}";
-
-                    if (!client.Exists(remoteFilePath))
-                    {
-                        return NotFound($"File {fileName} does not exist on the SFTP server.");
-                    }
-
-                    using (var fileStream = new MemoryStream())
-                    {
-                        client.DownloadFile(remoteFilePath, fileStream);
-                        client.Disconnect();
-
-                        // Return the file as a downloadable response
-                        fileStream.Seek(0, SeekOrigin.Begin);
-                        return File(fileStream, "application/octet-stream", fileName);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Error downloading file: {ex.Message}");
-                return StatusCode(500, $"Error downloading file: {ex.Message}");
-            }
-        }
-
-        // Delete a file from the SFTP server
-        [HttpDelete("delete-file/{fileName}")]
-        public IActionResult DeleteFile(string fileName)
-        {
-            try
-            {
-                using (var client = new SftpClient(_host, _port, _username, _password))
-                {
-                    client.Connect();
-                    if (!client.IsConnected)
-                    {
-                        return StatusCode(500, "Failed to connect to the SFTP server.");
-                    }
-
-                    string remoteFilePath = $"{_remoteUploadPath}/{fileName}";
-
-                    if (client.Exists(remoteFilePath))
-                    {
-                        client.DeleteFile(remoteFilePath);
-                        client.Disconnect();
-
-                        _logger.LogInformation($"File {fileName} deleted successfully.");
-                        return Ok(new { Message = $"File {fileName} deleted successfully." });
-                    }
-                    else
-                    {
-                        _logger.LogWarning($"File {fileName} does not exist on the SFTP server.");
-                        return NotFound($"File {fileName} does not exist.");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Error deleting file: {ex.Message}");
-                return StatusCode(500, $"Error deleting file: {ex.Message}");
+                _logger.LogError(ex, "Error while downloading folder.");
+                return StatusCode(500, "Internal server error: " + ex.Message);
             }
         }
     }

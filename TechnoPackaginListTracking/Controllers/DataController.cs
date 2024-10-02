@@ -48,6 +48,16 @@ namespace TechnoPackaginListTracking.Controllers
         [Route("upsert-request-form")]
         public async Task<ApiResponse<RequestForm>> UpsertRequestForm(RequestForm data)
         {
+            if(data.Id > 0)
+            {
+                data.CreatedBy = User?.Identity?.Name;
+                data.CreatedOn = DateTime.Now;
+            }
+            else
+            {
+                data.ModifiedBy = User?.Identity?.Name;
+                data.ModifiedOn = DateTime.Now;
+            }
             return await _appRepository.UpsertRequestForm(data);
         }
 

@@ -10,5 +10,6 @@ namespace TechnoPackaginListTracking.Dto
     {
         public bool IsUploaded { get; set; }
         public string FileLocation { get; set; }
+        public string Message { get; set; }
     }
 }
