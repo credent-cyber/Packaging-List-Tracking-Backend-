@@ -11,6 +11,7 @@ using NPOI.SS.UserModel;
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Authorization;
 using TechnoPackaginListTracking.Infrastructure.ActionFilters;
+using System.Security.Claims;
 
 namespace TechnoPackaginListTracking.Controllers.OData
 {
@@ -28,18 +29,39 @@ namespace TechnoPackaginListTracking.Controllers.OData
             _dbContext = dbContext;
         }
 
-        // Include child data when querying all RequestForms
+
         [EnableQuery]
         [ODataAuthorize]
         public IQueryable<RequestForm> Get()
         {
-            return _dbContext.RequestForms
-                .Include(o => o.Cartons) // Include Cartons
-                .Include(o => o.FileUploads) // Include FileUploads if needed
-                .AsQueryable();
+            var userEmail = HttpContext.User.Claims.ToList()[2].Value;
+            var userRole = HttpContext.User.Claims.ToList()[3].Value;
+
+            if (string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(userRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+            {
+                var requestForms = _dbContext.RequestForms
+                    .Include(o => o.Cartons)
+                    .Include(o => o.FileUploads)
+                    .AsQueryable();
+
+                return (IQueryable<RequestForm>)Ok(requestForms);
+            }
+            else if (string.Equals(userRole, "Vendor", StringComparison.OrdinalIgnoreCase))
+            {
+                var requestForms = _dbContext.RequestForms
+                    .Where(r => r.CreatedBy == userEmail)
+                    .Include(o => o.Cartons) 
+                    .Include(o => o.FileUploads) 
+                    .AsQueryable();
+
+                return (IQueryable<RequestForm>)Ok(requestForms);
+            }
+
+            // If the user role does not match, return Unauthorized
+            return (IQueryable<RequestForm>)Unauthorized("You do not have permission to access this resource.");
         }
 
-        // Optional: Custom method for paginated results with filtering and child data
+
         [HttpGet("paged")]
         [ODataAuthorize]
         public async Task<IActionResult> GetPaged(
@@ -47,11 +69,39 @@ namespace TechnoPackaginListTracking.Controllers.OData
             int pageSize = 10,
             string search = null)
         {
-            var query = _dbContext.RequestForms
-                .Include(o => o.Cartons) // Include Cartons
-                .Include(o => o.FileUploads) // Include FileUploads if needed
-                .AsQueryable();
+            //var userEmail = HttpContext.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+            //var userRole = HttpContext.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value;
+            var userEmail = HttpContext.User.Claims.ToList()[2].Value;
+            var userRole = HttpContext.User.Claims.ToList()[3].Value;
 
+            IQueryable<RequestForm> query;
+
+            // Check user role for authorization
+            if (string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(userRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+            {
+                // Admin or SuperAdmin can access all RequestForms
+                query = _dbContext.RequestForms
+                    .Include(o => o.Cartons) 
+                    .Include(o => o.FileUploads) 
+                    .AsQueryable();
+            }
+            else if (string.Equals(userRole, "Vendor", StringComparison.OrdinalIgnoreCase))
+            {
+                // Vendor can only access their own RequestForms
+                query = _dbContext.RequestForms
+                    .Where(r => r.CreatedBy == userEmail)
+                    .Include(o => o.Cartons) 
+                    .Include(o => o.FileUploads) 
+                    .AsQueryable();
+            }
+            else
+            {
+                // If the user role does not match, return Unauthorized
+                return Unauthorized("You do not have permission to access this resource.");
+            }
+
+            // Apply search filter if provided
             if (!string.IsNullOrWhiteSpace(search))
             {
                 query = query.Where(r => r.PackingListId.Contains(search) ||
@@ -85,16 +135,42 @@ namespace TechnoPackaginListTracking.Controllers.OData
         }
 
 
+
         // Export filtered data to Excel including child tables
         [HttpGet("exportExcel")]
         [ODataAuthorize]
         public async Task<IActionResult> ExportDataToExcel(
             string search = null)
         {
-            var query = _dbContext.RequestForms
-                .Include(o => o.Cartons)      // Include Cartons
-                .Include(o => o.FileUploads)  // Include FileUploads
-                .AsQueryable();
+            var userEmail = HttpContext.User.Claims.ToList()[2].Value;
+            var userRole = HttpContext.User.Claims.ToList()[3].Value;
+
+            IQueryable<RequestForm> query;
+
+            // Apply role-based filtering logic
+            if (string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(userRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+            {
+                // Admin or SuperAdmin can access all RequestForms
+                query = _dbContext.RequestForms
+                    .Include(o => o.Cartons)      // Include Cartons
+                    .Include(o => o.FileUploads)  // Include FileUploads if needed
+                    .AsQueryable();
+            }
+            else if (string.Equals(userRole, "Vendor", StringComparison.OrdinalIgnoreCase))
+            {
+                // Vendor can only access their own RequestForms
+                query = _dbContext.RequestForms
+                    .Where(r => r.CreatedBy == userEmail)
+                    .Include(o => o.Cartons)      // Include Cartons
+                    .Include(o => o.FileUploads)  // Include FileUploads if needed
+                    .AsQueryable();
+            }
+            else
+            {
+                // If the user role does not match, return Unauthorized
+                return Unauthorized("You do not have permission to export this data.");
+            }
 
             // Apply search filter if provided
             if (!string.IsNullOrWhiteSpace(search))
@@ -113,12 +189,10 @@ namespace TechnoPackaginListTracking.Controllers.OData
 
             var requestForms = await query.ToListAsync();
 
-            // Generate Excel file
             using (var workbook = new XLWorkbook())
             {
                 var worksheet = workbook.Worksheets.Add("RequestForms");
 
-                // Define header columns
                 worksheet.Cell(1, 1).Value = "Packing List ID";
                 worksheet.Cell(1, 2).Value = "Purchase Order";
                 worksheet.Cell(1, 3).Value = "From Port";
@@ -162,7 +236,6 @@ namespace TechnoPackaginListTracking.Controllers.OData
                         int cartonIndex = 0;
                         foreach (var carton in form.Cartons)
                         {
-                            // Write data for each carton, adding new rows for additional cartons
                             worksheet.Cell(i + 2 + cartonIndex, 11).Value = carton.Carton;
                             worksheet.Cell(i + 2 + cartonIndex, 12).Value = carton.ItemNumber;
                             worksheet.Cell(i + 2 + cartonIndex, 13).Value = carton.Color;
@@ -178,14 +251,12 @@ namespace TechnoPackaginListTracking.Controllers.OData
                         int fileIndex = 0;
                         foreach (var file in form.FileUploads)
                         {
-                            // Write data for each file, adding new rows for additional file uploads
                             worksheet.Cell(i + 2 + fileIndex, 16).Value = file.FileName;
                             worksheet.Cell(i + 2 + fileIndex, 17).Value = file.FileType;
                             fileIndex++;
                         }
                     }
                 }
-
 
                 // Save the Excel to a memory stream
                 using (var stream = new MemoryStream())
@@ -198,7 +269,7 @@ namespace TechnoPackaginListTracking.Controllers.OData
                     return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"RequestForms_{DateTime.Now:yyyyMMddHHmmss}.xlsx");
                 }
             }
-
         }
+
     }
 }

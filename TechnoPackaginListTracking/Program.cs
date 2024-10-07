@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using TechnoPackaginListTracking.Controllers;
 using TechnoPackaginListTracking.DataContext;
 using TechnoPackaginListTracking.DataContext.Models;
 using TechnoPackaginListTracking.Infrastructure;
@@ -144,6 +145,7 @@ builder.Services.AddScoped<BaseRepository>();
 builder.Services.AddScoped<IDataRepository, DataRepository>();
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddScoped<SFTPController>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

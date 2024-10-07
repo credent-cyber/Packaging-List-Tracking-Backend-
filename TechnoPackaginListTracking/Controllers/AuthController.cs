@@ -72,7 +72,7 @@ namespace TechnoPackaginListTracking.Controllers
                     await _userManager.UpdateAsync(user);
 
                     string roleToAssign;
-
+                    userCount = await _userManager.Users.CountAsync();
                     if (userCount == 1)
                     {
                         // Assign "SuperAdmin" role to the first user
@@ -196,6 +196,14 @@ namespace TechnoPackaginListTracking.Controllers
                     _logger.LogWarning("Invalid login attempt");
                     return Unauthorized("Invalid login attempt");
                 }
+
+                // Check if user is active
+                if (!user.IsActive)
+                {
+                    _logger.LogWarning($"Inactive user {model.UserEmail} attempted to log in");
+                    return Unauthorized("User account is inactive");
+                }
+
                 // Retrieve roles for the user
                 var roles = await _userManager.GetRolesAsync(user);
                 var roleName = roles.FirstOrDefault();
@@ -205,7 +213,7 @@ namespace TechnoPackaginListTracking.Controllers
                     new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
                     new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                     new Claim(ClaimTypes.Email, user.Email),
-                    new Claim(ClaimTypes.Role,roleName)
+                    new Claim(ClaimTypes.Role, roleName)
                 };
 
                 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
@@ -215,7 +223,7 @@ namespace TechnoPackaginListTracking.Controllers
                     issuer: _configuration["Jwt:Issuer"],
                     audience: _configuration["Jwt:Issuer"],
                     claims: claims,
-                    expires: DateTime.Now.AddMinutes(30),
+                    expires: DateTime.Now.AddDays(7),
                     signingCredentials: creds);
 
                 var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
@@ -230,6 +238,7 @@ namespace TechnoPackaginListTracking.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while logging in.");
             }
         }
+
 
 
         [HttpPost("forgetpassword")]
@@ -345,7 +354,7 @@ namespace TechnoPackaginListTracking.Controllers
             return Ok();
         }
 
-        [Authorize]
+       // [Authorize]
         [HttpGet("UserCount")]
         public async Task<IActionResult> UserCount()
         {
@@ -391,11 +400,23 @@ namespace TechnoPackaginListTracking.Controllers
                 return BadRequest(addRoleResult.Errors.FirstOrDefault()?.Description);
             }
 
+            // Update IsActive property
+            if (user.IsActive != userViewModel.IsActive)
+            {
+                user.IsActive = userViewModel.IsActive;
+                var updateResult = await _userManager.UpdateAsync(user);
+                if (!updateResult.Succeeded)
+                {
+                    return BadRequest(updateResult.Errors.FirstOrDefault()?.Description);
+                }
+            }
+
             return Ok();
         }
 
+
         [HttpGet("GetUsers")]
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> GetUsers()
         {
             var users = await _userManager.Users.ToListAsync();

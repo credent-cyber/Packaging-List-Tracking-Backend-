@@ -29,14 +29,10 @@
     <ProjectReference Include="..\TechnoPackaginListTracking.Dto\TechnoPackaginListTracking.Dto.csproj" />
     <ProjectReference Include="..\TechnoPackaginListTracking.Repositories\TechnoPackaginListTracking.Repositories.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="App_Data\" />
-  </ItemGroup>
 	<!-- Exclude appsettings.json and appsettings.Development.json from publishing -->
-	<!--<ItemGroup>
+	<ItemGroup>
 		<Content Remove="appsettings.json" />
 		<Content Remove="appsettings.Development.json" />
-	</ItemGroup>-->
+	</ItemGroup>
 
 </Project>

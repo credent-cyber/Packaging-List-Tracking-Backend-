@@ -173,5 +173,87 @@ namespace TechnoPackaginListTracking.Controllers
                 return StatusCode(500, "Internal server error: " + ex.Message);
             }
         }
+
+        //[HttpPost("UploadExcelToFtp/{requestId}")]
+        public async Task<UploadResult> UploadFileToFtp(string excelFilePath, string remoteDirectory, string packingListId)
+        {
+            try
+            {
+                // Ensure the file has a valid extension
+                var fileExtension = Path.GetExtension(excelFilePath);
+                var fileName = $"{packingListId}_PackingList{fileExtension}";
+                var remoteFilePath = $"{remoteDirectory}/{fileName}";
+
+                using (var sftpClient = new SftpClient(_host, _port, _username, _password))
+                {
+                    sftpClient.Connect();
+                    if (!sftpClient.IsConnected)
+                    {
+                        return new UploadResult { IsUploaded = false, Message = "Failed to connect to the SFTP server." };
+                    }
+
+                    // Create remote directory if it doesn't exist
+                    if (!sftpClient.Exists(remoteDirectory))
+                    {
+                        _logger.LogInformation($"Creating directory: {remoteDirectory}");
+                        sftpClient.CreateDirectory(remoteDirectory);
+                    }
+
+                    // Upload the file
+                    using (var fileStream = System.IO.File.OpenRead(excelFilePath))
+                    {
+                        sftpClient.UploadFile(fileStream, remoteFilePath);
+                    }
+
+                    sftpClient.Disconnect();
+                }
+
+                return new UploadResult { IsUploaded = true, FileLocation = remoteFilePath, Message = "File uploaded successfully." };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error uploading file to FTP.");
+                return new UploadResult { IsUploaded = false, Message = $"Error: {ex.Message}" };
+            }
+        }
+
+        [HttpDelete("DeleteFile/{requestId}/{fileName}")]
+        public async Task<IActionResult> DeleteFile(string requestId, string fileName)
+        {
+            try
+            {
+                // Generate the remote file path
+                var remoteFilePath = $"{requestId}/{fileName}";
+
+                // Connect to the SFTP server
+                using (var sftpClient = new SftpClient(_host, _port, _username, _password))
+                {
+                    sftpClient.Connect();
+                    if (!sftpClient.IsConnected)
+                    {
+                        return BadRequest("Failed to connect to the SFTP server.");
+                    }
+
+                    // Check if the file exists
+                    if (!sftpClient.Exists(remoteFilePath))
+                    {
+                        return NotFound($"File '{fileName}' does not exist in the folder '{requestId}'.");
+                    }
+
+                    // Delete the file
+                    sftpClient.DeleteFile(remoteFilePath);
+                    sftpClient.Disconnect();
+                }
+
+                return Ok($"File '{fileName}' deleted successfully from folder '{requestId}'.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while deleting file.");
+                return StatusCode(500, "Internal server error: " + ex.Message);
+            }
+        }
+
+
     }
 }

@@ -25,13 +25,15 @@ namespace TechnoPackaginListTracking.Controllers
         {
             try
             {
+                var userEmail = HttpContext.User.Claims.ToList()[2].Value ?? User;
+               
                 // Get the document path from configuration
                 var DocumentPath = configuration.GetValue<string>("DocumentUploadPath");
 
                 // Generate a unique file name by appending the user and current datetime
                 var fileExtension = Path.GetExtension(file.FileName);
                 var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss"); 
-                var uniqueFileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}_{User}_{timestamp}{fileExtension}";
+                var uniqueFileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}_{userEmail}_{timestamp}{fileExtension}";
 
                 var fileLocation = Path.Combine(env.ContentRootPath, DocumentPath, uniqueFileName);
 

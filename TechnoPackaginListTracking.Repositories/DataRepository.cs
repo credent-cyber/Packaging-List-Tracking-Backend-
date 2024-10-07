@@ -18,17 +18,23 @@ namespace TechnoPackaginListTracking.Repositories
 
 
         #region Request Form
-        public async Task<ApiResponse<RequestForm>> GetRequestFormById(int id)
+        public async Task<ApiResponse<RequestForm>> GetRequestFormById(int id, string userEmail, string userRole)
         {
             var data = new ApiResponse<RequestForm>();
             try
             {
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-                var queryData = AppDbCxt.RequestForms.Include(o=>o.Cartons).Include(o=>o.FileUploads).FirstOrDefault(o => o.Id == id);
+                if (string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(userRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+                {
+                    data.Result = AppDbCxt.RequestForms.Include(o=>o.Cartons).Include(o=>o.FileUploads).FirstOrDefault(o => o.Id == id);
+                }
+                else
+                {
+                    data.Result = AppDbCxt.RequestForms.Include(o=>o.Cartons).Include(o=>o.FileUploads).FirstOrDefault(o => o.Id == id && o.CreatedBy == userEmail);
+                }
 #pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
           
                 data.IsSuccess = true;
-                data.Result = queryData;
                 return await Task.FromResult(data);
             }
             catch (Exception ex)
@@ -40,17 +46,29 @@ namespace TechnoPackaginListTracking.Repositories
 
         }
 
-        public async Task<ApiResponse<IEnumerable<RequestForm>>> GetAllRequests()
+        public async Task<ApiResponse<IEnumerable<RequestForm>>> GetAllRequests(string userEmail, string userRole)
         {
             var data = new ApiResponse<IEnumerable<RequestForm>>();
+
             try
             {
-                data.Result = await AppDbCxt.RequestForms
-                    .Include(o => o.Cartons) // Correctly include Cartons
-                    .Include(o => o.FileUploads) // Correctly include Cartons
-                    .AsNoTracking() // Optional: improve performance
-                    .ToListAsync(); // Asynchronous call
+                if (string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(userRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+                {                 
+                    data.Result = await AppDbCxt.RequestForms
+                        .Include(o => o.Cartons) // Correctly include Cartons
+                        .Include(o => o.FileUploads) // Correctly include Cartons
+                        .AsNoTracking() // Optional: improve performance
+                        .ToListAsync(); // Asynchronous call
 
+                }
+                else
+                {
+                    data.Result = await AppDbCxt.RequestForms.Where(o=>o.CreatedBy == userEmail)
+                       .Include(o => o.Cartons) 
+                       .Include(o => o.FileUploads)
+                       .AsNoTracking() // Optional: improve performance
+                       .ToListAsync();
+                }
                 data.IsSuccess = true;
                 data.Message = "Success";
             }
@@ -240,6 +258,37 @@ namespace TechnoPackaginListTracking.Repositories
             }
             return inserted;
         }
+        #endregion
+
+
+        #region DropDowns
+        public async Task<List<Ports>> GetAllPorts()
+        {
+            try
+            {
+                return await AppDbCxt.Ports.ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                throw;
+            }
+        }
+
+        public async Task<List<DeliveryMode>> GetAllDeliveryMode()
+        {
+            try
+            {
+                return await AppDbCxt.DeliveryMode.ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                throw;
+            }
+        }
+
+
         #endregion
     }
 }
