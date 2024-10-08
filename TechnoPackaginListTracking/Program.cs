@@ -161,11 +161,16 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
     try
     {
-        var context = services.GetRequiredService<AuthDbContext>();
-        context.Database.Migrate();
+        // Migrate AuthDbContext
+        var authContext = services.GetRequiredService<AuthDbContext>();
+        authContext.Database.Migrate(); // Apply any pending migrations
 
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        if (db.Database.EnsureCreated())
+        // Migrate AppDbContext
+        var appContext = services.GetRequiredService<AppDbContext>();
+        appContext.Database.Migrate(); // Apply any pending migrations
+
+        // Optional: Seed data if needed (after migration)
+        if (appContext.Database.EnsureCreated())
         {
             // Seed data if required
         }
@@ -176,6 +181,7 @@ using (var scope = app.Services.CreateScope())
         logger.LogError(ex, "An error occurred while migrating the database.");
     }
 }
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment() || app.Environment.IsProduction())

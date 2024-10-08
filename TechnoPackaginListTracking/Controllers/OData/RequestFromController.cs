@@ -37,29 +37,27 @@ namespace TechnoPackaginListTracking.Controllers.OData
             var userEmail = HttpContext.User.Claims.ToList()[2].Value;
             var userRole = HttpContext.User.Claims.ToList()[3].Value;
 
-            if (string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(userRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(userRole, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
             {
-                var requestForms = _dbContext.RequestForms
-                    .Include(o => o.Cartons)
-                    .Include(o => o.FileUploads)
-                    .AsQueryable();
-
-                return (IQueryable<RequestForm>)Ok(requestForms);
+                return _dbContext.RequestForms
+                        .Include(o => o.Cartons)
+                        .Include(o => o.FileUploads)
+                        .AsQueryable();
             }
             else if (string.Equals(userRole, "Vendor", StringComparison.OrdinalIgnoreCase))
             {
-                var requestForms = _dbContext.RequestForms
-                    .Where(r => r.CreatedBy == userEmail)
-                    .Include(o => o.Cartons) 
-                    .Include(o => o.FileUploads) 
-                    .AsQueryable();
-
-                return (IQueryable<RequestForm>)Ok(requestForms);
+                return _dbContext.RequestForms
+                        .Where(r => r.CreatedBy == userEmail)
+                        .Include(o => o.Cartons)
+                        .Include(o => o.FileUploads)
+                        .AsQueryable();
             }
 
-            // If the user role does not match, return Unauthorized
-            return (IQueryable<RequestForm>)Unauthorized("You do not have permission to access this resource.");
+            // For unauthorized users, throw an exception or return an empty result
+            throw new UnauthorizedAccessException("You do not have permission to access this resource.");
         }
+
 
 
         [HttpGet("paged")]

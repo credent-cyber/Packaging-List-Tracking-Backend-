@@ -62,15 +62,16 @@ namespace TechnoPackaginListTracking.Controllers
 
             if (data.Id > 0)
             {
-                data.CreatedBy = userEmail;
-                data.CreatedOn = DateTime.Now;
-                data.ModifiedBy = "NA";
+                data.ModifiedBy = userEmail;
+                data.ModifiedOn = DateTime.Now;
+               
 
             }
             else
             {
-                data.ModifiedBy = userEmail;
-                data.ModifiedOn = DateTime.Now;
+                data.CreatedBy = userEmail;
+                data.CreatedOn = DateTime.Now;
+                data.ModifiedBy = "NA";
             }
 
             // Upsert the request form data
@@ -201,13 +202,14 @@ namespace TechnoPackaginListTracking.Controllers
                     worksheet.Cell(currentRow, 9).Value = data.ShippingCompany;
                     worksheet.Cell(currentRow, 10).Value = data.ModeOfDelivery;
                     worksheet.Cell(currentRow, 11).Value = data.Mode;
+                    worksheet.Cell(currentRow, 12).Value = data.PurchaseOrder;
 
                     // Fill Carton details
-                    worksheet.Cell(currentRow, 12).Value = carton.Carton;
-                    worksheet.Cell(currentRow, 13).Value = carton.ItemNumber;
-                    worksheet.Cell(currentRow, 14).Value = carton.Color;
-                    worksheet.Cell(currentRow, 15).Value = carton.Size;
-                    worksheet.Cell(currentRow, 16).Value = carton.Quantity;
+                    worksheet.Cell(currentRow, 13).Value = carton.Carton;
+                    worksheet.Cell(currentRow, 14).Value = carton.ItemNumber;
+                    worksheet.Cell(currentRow, 15).Value = carton.Color;
+                    worksheet.Cell(currentRow, 16).Value = carton.Size;
+                    worksheet.Cell(currentRow, 17).Value = carton.Quantity;
 
                     currentRow++;
                 }
