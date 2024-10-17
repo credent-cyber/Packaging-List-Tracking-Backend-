@@ -38,6 +38,7 @@ namespace TechnoPackaginListTracking.Controllers
         [Route("request-form/{id}")]
         public async Task<ApiResponse<RequestForm>> GetRequestFormById(int id)
         {
+
             var userEmail = HttpContext.User.Claims.ToList()[2].Value;
             var userRole = HttpContext.User.Claims.ToList()[3].Value;
             return await _appRepository.GetRequestFormById(id, userEmail, userRole);
@@ -48,6 +49,7 @@ namespace TechnoPackaginListTracking.Controllers
       
         public async Task<ApiResponse<IEnumerable<RequestForm>>> GetAllRequests()
         {
+            var authorizationHeader = HttpContext.Request.Headers["Authorization"].ToString();
             var userEmail = HttpContext.User.Claims.ToList()[2].Value;
             var userRole = HttpContext.User.Claims.ToList()[3].Value;
             return await _appRepository.GetAllRequests(userEmail, userRole);
@@ -119,6 +121,14 @@ namespace TechnoPackaginListTracking.Controllers
             return await _appRepository.DeleteRequestFormById(id);
         }
 
+
+        [HttpGet]
+        [Route("get-packagingListId")]
+
+        public async Task<string> GetPackagingListId()
+        {
+            return await _appRepository.GetPackagingListId();
+        }
         #endregion
 
         #region Settings
@@ -285,6 +295,21 @@ namespace TechnoPackaginListTracking.Controllers
         public async Task<List<DeliveryMode>> GetAllDeliveryMode()
         {
             return await _appRepository.GetAllDeliveryMode();
+        }
+
+        [HttpGet]
+        [Route("all-modes")]
+
+        public async Task<List<Mode>> GetAllModes()
+        {
+            return await _appRepository.GetAllModes();
+        }
+        [HttpGet]
+        [Route("all-cartonsSize")]
+
+        public async Task<List<CartonsSize>> GetAllCartonsSize()
+        {
+            return await _appRepository.GetAllCartonsSize();
         }
         #endregion
     }

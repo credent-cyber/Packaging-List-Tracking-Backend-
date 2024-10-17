@@ -309,11 +309,13 @@ namespace TechnoPackaginListTracking.Controllers
 
         [Authorize]
         [HttpPost("ChangePassword")]
-        public async Task<IActionResult> ChangePassword(ChangePassword changePassword)
+        public async Task<IActionResult> ChangePassword([FromBody]  ChangePassword changePassword)
         {
             try
             {
-                var user = await _userManager.GetUserAsync(HttpContext.User);
+                var userEmail = HttpContext.User.Claims.ToList()[2].Value;
+                var user = await _userManager.FindByEmailAsync(userEmail);
+                //var user = await _userManager.GetUserAsync(HttpContext.User);
 
                 if (user == null)
                 {
@@ -366,16 +368,16 @@ namespace TechnoPackaginListTracking.Controllers
         [Authorize(Roles = "SuperAdmin,Admin")]
         public async Task<IActionResult> UpdateUserRole(UserViewModel userViewModel)
         {
-            var user = await _userManager.FindByIdAsync(userViewModel.Id.ToString());
+            //var user = await _userManager.FindByIdAsync(userViewModel.Id.ToString());
+            var user = await _userManager.FindByEmailAsync(userViewModel.Email);
 
             if (user == null)
             {
                 return NotFound();
             }
 
-            var roles = await _userManager.GetRolesAsync(user);
-
             // Remove all roles from the user
+            var roles = await _userManager.GetRolesAsync(user);
             var removeRolesResult = await _userManager.RemoveFromRolesAsync(user, roles);
             if (!removeRolesResult.Succeeded)
             {
@@ -404,15 +406,45 @@ namespace TechnoPackaginListTracking.Controllers
             if (user.IsActive != userViewModel.IsActive)
             {
                 user.IsActive = userViewModel.IsActive;
-                var updateResult = await _userManager.UpdateAsync(user);
-                if (!updateResult.Succeeded)
-                {
-                    return BadRequest(updateResult.Errors.FirstOrDefault()?.Description);
-                }
+            }
+
+            // Update additional user properties
+            if (user.UserName != userViewModel.UserName)
+            {
+                user.UserName = userViewModel.UserName;
+            }
+
+            if (user.Email != userViewModel.Email)
+            {
+                user.Email = userViewModel.Email;
+            }
+
+            // Assuming there are custom properties in your ApplicationUser class for VendorId and MobileNo
+            if (user.VendorId != userViewModel.VendorId)
+            {
+                user.VendorId = userViewModel.VendorId;
+            }
+
+            if (user.VendorName != userViewModel.VendorName)
+            {
+                user.VendorName = userViewModel.VendorName;
+            }
+
+            if (user.PhoneNumber != userViewModel.MobileNo)
+            {
+                user.PhoneNumber = userViewModel.MobileNo;
+            }
+
+            // Update the user in the database
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                return BadRequest(updateResult.Errors.FirstOrDefault()?.Description);
             }
 
             return Ok();
         }
+
 
 
         [HttpGet("GetUsers")]

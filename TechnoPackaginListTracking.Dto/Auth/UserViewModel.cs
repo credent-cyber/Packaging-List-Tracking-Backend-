@@ -13,6 +13,7 @@ namespace TechnoPackaginListTracking.Dto.Auth
         public string Email { get; set; }
         public string VendorId { get; set; }
         public string VendorName { get; set; }
+        public string MobileNo { get; set; }
         public string Role { get; set; }
         public bool IsActive { get; set; }
     }

@@ -15,7 +15,10 @@ namespace TechnoPackaginListTracking.Repositories
         Task<ApiResponse<bool>> DeleteRequestFormById(int id);
         Task<Dictionary<string, string>> GetSettings(string Key);
         Task<Dictionary<string, string>> UpsertSettings(Dictionary<string, string> settings, string value);
+        Task<string> GetPackagingListId();
         Task<List<Ports>> GetAllPorts();
         Task<List<DeliveryMode>> GetAllDeliveryMode();
+        Task<List<Mode>> GetAllModes();
+        Task<List<CartonsSize>> GetAllCartonsSize();
     }
 }

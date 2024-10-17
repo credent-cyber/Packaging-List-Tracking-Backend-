@@ -30,6 +30,19 @@ namespace TechnoPackaginListTracking.DataContext.Migrations.App
                 });
 
             migrationBuilder.CreateTable(
+                name: "CartonsSize",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Size = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CartonsSize", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "DeliveryMode",
                 columns: table => new
                 {
@@ -40,6 +53,19 @@ namespace TechnoPackaginListTracking.DataContext.Migrations.App
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_DeliveryMode", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Modes",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ModeName = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Modes", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -152,10 +178,16 @@ namespace TechnoPackaginListTracking.DataContext.Migrations.App
                 name: "Cartons");
 
             migrationBuilder.DropTable(
+                name: "CartonsSize");
+
+            migrationBuilder.DropTable(
                 name: "DeliveryMode");
 
             migrationBuilder.DropTable(
                 name: "FileUploads");
+
+            migrationBuilder.DropTable(
+                name: "Modes");
 
             migrationBuilder.DropTable(
                 name: "Ports");

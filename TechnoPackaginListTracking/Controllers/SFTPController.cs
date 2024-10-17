@@ -255,5 +255,49 @@ namespace TechnoPackaginListTracking.Controllers
         }
 
 
+        [HttpGet("DownloadFile/{requestId}/{fileName}")]
+        public async Task<IActionResult> DownloadFile(string requestId, string fileName)
+        {
+            try
+            {
+                // Generate the remote file path
+                var remoteFilePath = $"{requestId}/{fileName}";
+
+                // Connect to the SFTP server
+                using (var sftpClient = new SftpClient(_host, _port, _username, _password))
+                {
+                    sftpClient.Connect();
+                    if (!sftpClient.IsConnected)
+                    {
+                        return BadRequest("Failed to connect to the SFTP server.");
+                    }
+
+                    // Check if the file exists on the SFTP server
+                    if (!sftpClient.Exists(remoteFilePath))
+                    {
+                        return NotFound($"File '{fileName}' does not exist in the folder '{requestId}'.");
+                    }
+
+                    // Download the file into a memory stream
+                    using (var memoryStream = new MemoryStream())
+                    {
+                        sftpClient.DownloadFile(remoteFilePath, memoryStream);
+                        memoryStream.Position = 0; // Reset the stream position
+
+                        sftpClient.Disconnect();
+
+                        // Return the file as a downloadable response
+                        return File(memoryStream.ToArray(), "application/octet-stream", fileName);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while downloading the file.");
+                return StatusCode(500, "Internal server error: " + ex.Message);
+            }
+        }
+
+
     }
 }

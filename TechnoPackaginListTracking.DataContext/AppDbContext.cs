@@ -23,6 +23,8 @@ namespace TechnoPackaginListTracking.DataContext
         public DbSet<AppSettings> AppSettings { get; set; }
         public DbSet<Ports> Ports { get; set; }
         public DbSet<DeliveryMode> DeliveryMode { get; set; }
+        public DbSet<CartonsSize> CartonsSize { get; set; }
+        public DbSet<Mode> Modes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

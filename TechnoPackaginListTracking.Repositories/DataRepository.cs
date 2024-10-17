@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using TechnoPackaginListTracking.DataContext;
 using TechnoPackaginListTracking.Dto;
 using Microsoft.EntityFrameworkCore;
+using System.Data.SqlClient;
 
 namespace TechnoPackaginListTracking.Repositories
 {
@@ -84,6 +85,9 @@ namespace TechnoPackaginListTracking.Repositories
         public async Task<ApiResponse<RequestForm>> UpsertRequestForm(RequestForm data)
         {
             var result = new ApiResponse<RequestForm>();
+            const int maxRetries = 3; // Maximum number of retries for unique ID generation
+            int retryCount = 0;
+
             try
             {
                 if (data == null)
@@ -93,15 +97,14 @@ namespace TechnoPackaginListTracking.Repositories
                 if (data.Id > 0)
                 {
                     // Retrieve the existing RequestForm from the database
-                    var existingRequestForm = AppDbCxt.RequestForms
-                        .Include(r => r.FileUploads) 
-                        .Include(r => r.Cartons)  
-                        .FirstOrDefault(r => r.Id == data.Id);
+                    var existingRequestForm = await AppDbCxt.RequestForms
+                        .Include(r => r.FileUploads)
+                        .Include(r => r.Cartons)
+                        .FirstOrDefaultAsync(r => r.Id == data.Id);
 
                     if (existingRequestForm == null)
                         throw new ArgumentException("Request form not found");
 
-                
                     AppDbCxt.Entry(existingRequestForm).CurrentValues.SetValues(data);
 
                     // Remove cartons that are not in the new data
@@ -156,10 +159,45 @@ namespace TechnoPackaginListTracking.Repositories
                 }
                 else
                 {
-                    AppDbCxt.RequestForms.Add(data);
-                }
+                    while (retryCount < maxRetries)
+                    {
+                        try
+                        {
+                            var latestPackingListId = await AppDbCxt.RequestForms
+                                .OrderByDescending(o => o.Id)
+                                .Select(o => o.PackingListId)
+                                .FirstOrDefaultAsync();
 
-                AppDbCxt.SaveChanges();
+                            if (!string.IsNullOrEmpty(latestPackingListId))
+                            {
+                                // Extract numeric part from the PackingListId
+                                string numericPart = new string(latestPackingListId.Where(char.IsDigit).ToArray());
+                                string prefixPart = new string(latestPackingListId.Where(char.IsLetter).ToArray());
+
+                                // If we have a numeric part, increment it
+                                if (int.TryParse(numericPart, out int packingListIdNumber))
+                                {
+                                    data.PackingListId = $"{prefixPart}{packingListIdNumber + 1}";
+                                }
+                            }
+
+                            // Add the new RequestForm
+                            await AppDbCxt.RequestForms.AddAsync(data);
+                            await AppDbCxt.SaveChangesAsync();
+                            break; // Exit loop if successful
+                        }
+                        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+                        {
+                            // Increment retry count and prepare for the next iteration
+                            retryCount++;
+                        }
+                    }
+
+                    if (retryCount == maxRetries)
+                    {
+                        throw new Exception("Failed to generate a unique PackingListId after multiple attempts.");
+                    }
+                }
 
                 result.IsSuccess = true;
                 result.Message = "Success";
@@ -174,6 +212,44 @@ namespace TechnoPackaginListTracking.Repositories
             }
         }
 
+        private bool IsUniqueConstraintViolation(DbUpdateException ex)
+        {
+            // Check for unique constraint violation, adjust this based on your database provider
+            return ex.InnerException is SqlException sqlEx && sqlEx.Number == 2627; // SQL Server unique constraint violation number
+        }
+
+
+        public async Task<string> GetPackagingListId()
+        {
+            try
+            {
+
+                var latestPackingListId = await AppDbCxt.RequestForms
+                    .OrderByDescending(o => o.Id)
+                    .Select(o => o.PackingListId)
+                    .FirstOrDefaultAsync();
+
+                if (!string.IsNullOrEmpty(latestPackingListId))
+                {
+                    // Extract numeric part from the PackingListId
+                    string numericPart = new string(latestPackingListId.Where(char.IsDigit).ToArray());
+                    string prefixPart = new string(latestPackingListId.Where(char.IsLetter).ToArray());
+
+                    // If we have a numeric part, increment it
+                    if (int.TryParse(numericPart, out int packingListIdNumber))
+                    {
+                        return $"{prefixPart}{packingListIdNumber + 1}";
+                    }
+                }
+
+                // If no valid PackingListId exists, return default value with prefix
+                return "200001";
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
 
         public async Task<ApiResponse<bool>> DeleteRequestFormById(int id)
         {
@@ -204,6 +280,7 @@ namespace TechnoPackaginListTracking.Repositories
                 return await Task.FromResult(result);
             }
         }
+
 
 
         #endregion
@@ -288,6 +365,31 @@ namespace TechnoPackaginListTracking.Repositories
             }
         }
 
+        public async Task<List<Mode>> GetAllModes()
+        {
+            try
+            {
+                return await AppDbCxt.Modes.ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                throw;
+            }
+        }
+
+        public async Task<List<CartonsSize>> GetAllCartonsSize()
+        {
+            try
+            {
+                return await AppDbCxt.CartonsSize.ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                throw;
+            }
+        }
 
         #endregion
     }

@@ -12,7 +12,7 @@ using TechnoPackaginListTracking.DataContext;
 namespace TechnoPackaginListTracking.DataContext.Migrations.App
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20241007075347_InitialCreate")]
+    [Migration("20241010051937_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -98,6 +98,23 @@ namespace TechnoPackaginListTracking.DataContext.Migrations.App
                     b.ToTable("Cartons");
                 });
 
+            modelBuilder.Entity("TechnoPackaginListTracking.Dto.CartonsSize", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Size")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CartonsSize");
+                });
+
             modelBuilder.Entity("TechnoPackaginListTracking.Dto.DeliveryMode", b =>
                 {
                     b.Property<int>("Id")
@@ -142,6 +159,23 @@ namespace TechnoPackaginListTracking.DataContext.Migrations.App
                     b.HasIndex("RequestFormId");
 
                     b.ToTable("FileUploads");
+                });
+
+            modelBuilder.Entity("TechnoPackaginListTracking.Dto.Mode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ModeName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Modes");
                 });
 
             modelBuilder.Entity("TechnoPackaginListTracking.Dto.Ports", b =>
