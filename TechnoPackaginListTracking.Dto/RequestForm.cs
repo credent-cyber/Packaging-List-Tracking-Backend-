@@ -35,8 +35,8 @@ namespace TechnoPackaginListTracking.Dto
     {
 
         public int RequestFormId { get; set; } // This is the foreign key
-       // public virtual RequestForm? RequestForm { get; set; } // Navigation property
-
+                                               // public virtual RequestForm? RequestForm { get; set; } // Navigation property
+        public string PurchaseOrderNumber { get; set; } = string.Empty;
         public string Carton { get; set; }
         public string ItemNumber { get; set; }
         public string Color { get; set; }

@@ -43,6 +43,7 @@ namespace TechnoPackaginListTracking.Controllers.OData
                 return _dbContext.RequestForms
                         .Include(o => o.Cartons)
                         .Include(o => o.FileUploads)
+                        .OrderByDescending(o => o.Id)
                         .AsQueryable();
             }
             else if (string.Equals(userRole, "Vendor", StringComparison.OrdinalIgnoreCase))
@@ -51,6 +52,7 @@ namespace TechnoPackaginListTracking.Controllers.OData
                         .Where(r => r.CreatedBy == userEmail)
                         .Include(o => o.Cartons)
                         .Include(o => o.FileUploads)
+                        .OrderByDescending(o => o.Id)
                         .AsQueryable();
             }
 
@@ -81,7 +83,8 @@ namespace TechnoPackaginListTracking.Controllers.OData
                 // Admin or SuperAdmin can access all RequestForms
                 query = _dbContext.RequestForms
                     .Include(o => o.Cartons) 
-                    .Include(o => o.FileUploads) 
+                    .Include(o => o.FileUploads)
+                    .OrderByDescending(o => o.Id)
                     .AsQueryable();
             }
             else if (string.Equals(userRole, "Vendor", StringComparison.OrdinalIgnoreCase))
@@ -90,7 +93,8 @@ namespace TechnoPackaginListTracking.Controllers.OData
                 query = _dbContext.RequestForms
                     .Where(r => r.CreatedBy == userEmail)
                     .Include(o => o.Cartons) 
-                    .Include(o => o.FileUploads) 
+                    .Include(o => o.FileUploads)
+                    .OrderByDescending(o => o.Id)
                     .AsQueryable();
             }
             else
